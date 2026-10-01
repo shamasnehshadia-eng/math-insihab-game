@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>مغامرة التحويلات الرياضية</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;800&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Cairo', sans-serif;
+            background: linear-gradient(135deg, #f3e7e9 0%, #e3eeff 99%, #e3eeff 100%);
+            min-height: 100vh;
+            overflow-x: hidden;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+        }
+
+        .layout-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1.25rem;
+            width: 100%;
+        }
+
+        /* ترتيب العناصر في الموبايل */
+        .grid-header { order: 1; }
+        .grid-canvas { order: 2; }
+        .grid-controls { order: 3; }
+
+        /* ترتيب العناصر في شاشات الكمبيوتر والتابلت الأفقي */
+        @media (min-width: 1024px) {
+            .layout-grid {
+                grid-template-columns: 400px 1fr;
+                grid-template-areas:
+                    "header canvas"
+                    "controls canvas";
+                gap: 2rem;
+            }
+            .grid-header { grid-area: header; order: unset; }
+            .grid-controls { grid-area: controls; align-self: start; order: unset; }
+            .grid-canvas { grid-area: canvas; order: unset; }
+        }
+
+        .canvas-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin: 0 auto;
+            aspect-ratio: 1 / 1;
+            background-color: white;
+            border-radius: 16px;
+            box-shadow: inset 0 4px 6px rgba(0, 0, 0, 0.05);
+            overflow: hidden;
+            border: 2px solid #e2e8f0;
+            touch-action: none; /* منع التمرير عند لمس الرسم البياني */
+            cursor: grab;
+        }
+
+        .canvas-container:active {
+            cursor: grabbing;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+        }
+
+        .control-btn {
+            background: linear-gradient(145deg, #ffffff, #e6e6e6);
+            border: none;
+            border-radius: 12px;
+            box-shadow: 3px 3px 6px #d1d1d1, -3px -3px 6px #ffffff;
+            color: #4f46e5;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .control-btn:active {
+            box-shadow: inset 3px 3px 6px #d1d1d1, inset -3px -3px 6px #ffffff;
+            transform: scale(0.95);
+        }
+
+        .option-btn {
+            border: 2px solid #e5e7eb;
+            transition: all 0.3s ease;
+        }
+        .option-btn.selected {
+            border-color: #8b5cf6;
+            background-color: #f5f3ff;
+            color: #6d28d9;
+        }
+
+        .fade-in { animation: fadeIn 0.5s ease-in-out; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .bounce-in { animation: bounceIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        @keyframes bounceIn {
+            0% { transform: scale(0); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        #feedback-modal {
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+        }
+        
+        .hide { display: none !important; }
+        
+        /* تنسيق النصوص الرياضية لتبدو متناسقة */
+        .math-text {
+            display: inline-block;
+            font-weight: 800;
+            color: #4338ca;
+            direction: rtl;
+            unicode-bidi: isolate;
+        }
+    </style>
+</head>
+<body class="text-gray-800">
+
+    <div id="start-screen" class="flex-1 flex items-center justify-center p-4 fade-in">
+        <div class="glass-panel p-8 md:p-12 max-w-lg w-full text-center">
+            <div class="mb-6 text-indigo-600 text-6xl bounce-in">
+                <i class="fa-solid fa-gamepad"></i>
+            </div>
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-800 mb-2 text-indigo-700">مغامرة التحويلات الرياضية</h1>
+            <h2 class="text-xl text-gray-600 mb-8">رسم انسحاب وانعكاس الاقترانات</h2>
+            
+            <div class="bg-indigo-50 rounded-xl p-6 mb-8 text-right border border-indigo-100">
+                <p class="mb-2 text-lg"><i class="fa-solid fa-user-graduate text-indigo-500 ml-2"></i> أهلاً بكِ يا <strong>عزيزتي الطالبة</strong></p>
+                <p class="mb-2"><i class="fa-solid fa-chalkboard-user text-indigo-500 ml-2"></i> <strong>الصف:</strong> العاشر</p>
+                <p class="text-sm text-gray-500 mt-4 text-center">اختبري مهاراتك في التحويلات الهندسية للاقترانات!</p>
+            </div>
+
+            <button onclick="startGame()" class="w-full bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-bold py-4 px-8 rounded-xl shadow-lg transform transition hover:scale-105 text-xl">
+                🚀 ابدأ المغامرة
+            </button>
+        </div>
+    </div>
+
+    <div id="game-screen" class="hide flex-1 flex flex-col p-4 md:p-6 max-w-7xl w-full mx-auto fade-in">
+        
+        <!-- الشريط العلوي (النقاط، القلوب، التقدم) -->
+        <div class="glass-panel p-4 mb-4 flex flex-wrap justify-between items-center gap-3 w-full">
+            <div class="flex items-center gap-2">
+                <span class="text-sm md:text-lg font-bold text-gray-700">المستوى:</span>
+                <span id="level-indicator" class="bg-indigo-100 text-indigo-800 py-1 px-3 rounded-full font-bold text-sm md:text-base">١ / ٩</span>
+            </div>
+            
+            <div class="flex-1 mx-4 max-w-md bg-gray-200 rounded-full h-3">
+                <div id="progress-bar" class="bg-gradient-to-r from-green-400 to-blue-500 h-3 rounded-full transition-all duration-500" style="width: 0%"></div>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <div class="text-red-500 text-lg md:text-xl tracking-widest" id="lives-display">❤️❤️❤️</div>
+                <div class="bg-yellow-100 text-yellow-700 py-1 px-3 rounded-full font-bold flex items-center gap-2">
+                    <i class="fa-solid fa-star text-yellow-500"></i>
+                    <span id="score-display">٠</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- شبكة التخطيط الرئيسية (Responsive Grid) -->
+        <div class="layout-grid">
+            
+            <div class="grid-header glass-panel p-5 md:p-6 flex flex-col justify-center">
+                <h3 id="level-title" class="text-xl md:text-2xl font-bold text-indigo-700 mb-3">عنوان المستوى</h3>
+                <p id="level-instruction" class="text-gray-700 text-base md:text-lg leading-relaxed">تعليمات المستوى تظهر هنا...</p>
+            </div>
+
+            <div class="grid-canvas glass-panel p-4 flex flex-col items-center justify-center">
+                <div class="canvas-container w-full">
+                    <canvas id="math-canvas"></canvas>
+                </div>
+                <!-- مفتاح الألوان -->
+                <div class="flex flex-wrap justify-center gap-4 mt-4 text-xs md:text-sm font-bold text-gray-600">
+                    <div class="flex items-center gap-2"><span class="w-4 h-1 bg-blue-500 block"></span> ق(س) الأصلي</div>
+                    <div class="flex items-center gap-2"><span class="w-4 h-1 bg-pink-500 block"></span> ق(س) بعد التحويل</div>
+                </div>
+            </div>
+
+            <div class="grid-controls glass-panel p-5 md:p-6 flex flex-col justify-between">
+                
+                <div id="interactive-controls" class="mb-4">
+                    <p class="text-center font-bold mb-4 text-gray-600 text-sm md:text-base"><i class="fa-solid fa-hand-pointer ml-1 text-indigo-400"></i> اسحبي الاقتران بإصبعك أو استخدمي الأسهم</p>
+                    
+                    <!-- أزرار الأسهم -->
+                    <div class="grid grid-cols-3 gap-2 w-full max-w-[180px] mx-auto mb-6">
+                        <div></div>
+                        <button onclick="moveGraph(0, 1)" class="control-btn h-12 w-full text-xl" title="أعلى"><i class="fa-solid fa-arrow-up"></i></button>
+                        <div></div>
+                        <button onclick="moveGraph(-1, 0)" class="control-btn h-12 w-full text-xl" title="يسار"><i class="fa-solid fa-arrow-left"></i></button>
+                        <button onclick="resetMovement()" class="control-btn h-12 w-full text-sm text-red-500" title="إعادة للصفر"><i class="fa-solid fa-rotate-left"></i></button>
+                        <button onclick="moveGraph(1, 0)" class="control-btn h-12 w-full text-xl" title="يمين"><i class="fa-solid fa-arrow-right"></i></button>
+                        <div></div>
+                        <button onclick="moveGraph(0, -1)" class="control-btn h-12 w-full text-xl" title="أسفل"><i class="fa-solid fa-arrow-down"></i></button>
+                        <div></div>
+                    </div>
+
+                    <!-- أزرار الانعكاس -->
+                    <div class="flex flex-col sm:flex-row gap-3 justify-center">
+                        <button onclick="toggleReflect('x')" id="btn-reflect-x" class="w-full bg-purple-100 hover:bg-purple-200 text-purple-700 font-bold py-3 px-4 rounded-xl transition border border-purple-300 text-sm">
+                            ↕ انعكاس حول محور س
+                        </button>
+                        <button onclick="toggleReflect('y')" id="btn-reflect-y" class="w-full bg-purple-100 hover:bg-purple-200 text-purple-700 font-bold py-3 px-4 rounded-xl transition border border-purple-300 text-sm">
+                            ↔ انعكاس حول محور ص
+                        </button>
+                    </div>
+                </div>
+
+                <!-- خيارات الاختيار من متعدد -->
+                <div id="quiz-options" class="hide flex flex-col gap-3 mb-6 w-full">
+                    <!-- الخيارات تضاف برمجياً -->
+                </div>
+
+                <div class="mt-auto pt-4 border-t border-gray-100">
+                    <button id="btn-check" onclick="checkAnswer()" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-6 rounded-xl shadow transition text-lg md:text-xl">
+                        <i class="fa-solid fa-check-circle ml-2"></i> تحقق من الإجابة
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="end-screen" class="hide flex-1 flex items-center justify-center p-4 fade-in">
+        <div class="glass-panel p-8 md:p-12 max-w-2xl w-full text-center relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-32 h-32 bg-yellow-300 rounded-br-full opacity-50"></div>
+            <div class="absolute bottom-0 right-0 w-32 h-32 bg-indigo-300 rounded-tl-full opacity-50"></div>
+            
+            <div class="mb-4 text-yellow-500 text-7xl bounce-in">🏆</div>
+            <h1 class="text-3xl md:text-4xl font-bold text-indigo-700 mb-2">أحسنتِ يا عزيزتي الطالبة!</h1>
+            <p class="text-lg md:text-xl text-gray-600 mb-8">لقد أتممتِ مغامرة التحويلات الرياضية بنجاح.</p>
+            
+            <div class="bg-white rounded-xl p-6 md:p-8 border-4 border-double border-indigo-200 mb-8 shadow-sm">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6">شهادة إنجاز</h2>
+                <p class="text-lg mb-2">تُمنح هذه الشهادة للطالبة المتميزة لإتمام المهام بنجاح</p>
+                <div class="text-gray-600 mt-4">
+                    <p>الصف العاشر</p>
+                </div>
+                
+                <div class="mt-8 grid grid-cols-2 gap-4 border-t pt-6">
+                    <div>
+                        <p class="text-gray-500 text-sm">النقاط النهائية</p>
+                        <p class="text-3xl font-bold text-yellow-500" id="final-score">٠</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-500 text-sm">المحاولات المتبقية</p>
+                        <p class="text-2xl font-bold text-red-500" id="final-lives">❤️❤️❤️</p>
+                    </div>
+                </div>
+            </div>
+
+            <button onclick="location.reload()" class="bg-gray-800 hover:bg-gray-900 text-white font-bold py-4 px-8 rounded-xl shadow transition text-lg w-full sm:w-auto">
+                <i class="fa-solid fa-rotate-right ml-2"></i> العودة للبداية
+            </button>
+        </div>
+    </div>
+
+    <!-- نافذة التغذية الراجعة -->
+    <div id="feedback-modal" class="hide fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl shadow-2xl p-6 md:p-8 max-w-md w-full text-center transform transition-transform">
+            <div id="feedback-icon" class="text-6xl mb-4">🎉</div>
+            <h3 id="feedback-title" class="text-2xl font-bold mb-2 text-gray-800">أحسنتِ!</h3>
+            <p id="feedback-msg" class="text-gray-600 mb-8 text-lg leading-relaxed">شرح الإجابة يظهر هنا</p>
+            
+            <button id="btn-feedback-action" onclick="closeFeedback()" class="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-4 px-6 rounded-xl transition text-lg">
+                متابعة
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let currentLevel = 0;
+        let score = 0;
+        let lives = 3;
+        let maxLevels = 9;
+        
+        let userTransform = { h: 0, k: 0, rx: false, ry: false };
+        let selectedOptionId = null;
+
+        // دالة تحويل الأرقام إلى عربية
+        function toArabicNum(str) {
+            return str.toString().replace(/\d/g, d => '٠١٢٣٤٥٦٧٨٩'[d]);
+        }
+
+        // إعدادات الكانفاس
+        const canvas = document.getElementById('math-canvas');
+        const ctx = canvas.getContext('2d');
+        const canvasSize = 600; 
+        canvas.width = canvasSize;
+        canvas.height = canvasSize;
+        const scale = 30; // البكسلات لكل وحدة 
+        const origin = { x: canvas.width / 2, y: canvas.height / 2 };
+
+        const levels = [
+            {
+                type: 'interactive',
+                title: 'المستوى الأول: انسحاب أفقي وعمودي',
+                instruction: 'عزيزتي الطالبة، حركي الاقتران الأصلي <span class="math-text">ق(س) = س²</span> <br>بمقدار <strong>٣ وحدات إلى اليمين</strong> و <strong>وحدتين إلى الأعلى</strong> باستخدام إصبعك أو الأزرار.',
+                baseFunc: 'x2', 
+                targetTransform: { h: 3, k: 2, rx: false, ry: false },
+                successMsg: 'ممتازة! عند انسحاب الاقتران ٣ وحدات لليمين ووحدتين للأعلى تصبح القاعدة:<br> <span class="math-text text-xl mt-3 block bg-indigo-50 p-2 rounded">ق(س) = (س - ٣)² + ٢</span>',
+                hintMsg: 'تذكري: يمكنك لمس المنحنى وسحبه مباشرة، أو استخدام زر السهم الأيمن للتحرك يميناً، والسهم العلوي للأعلى.'
+            },
+            {
+                type: 'quiz',
+                title: 'المستوى الثاني: اكتشفي التحويل',
+                instruction: 'انظري إلى الرسم. الاقتران الأصلي الأزرق هو <span class="math-text">ق(س) = |س|</span>، والاقتران الوردي هو الناتج. ما هو التحويل الذي حدث؟',
+                baseFunc: 'abs', 
+                targetTransform: { h: -4, k: -1, rx: false, ry: false }, 
+                options: [
+                    { id: 1, text: 'انسحاب أفقي ٤ وحدات لليمين ووحدة للأسفل', isCorrect: false },
+                    { id: 2, text: 'انسحاب أفقي ٤ وحدات لليسار ووحدة للأسفل', isCorrect: true },
+                    { id: 3, text: 'انسحاب أفقي ٤ وحدات لليسار ووحدة للأعلى', isCorrect: false }
+                ],
+                successMsg: 'رائعة! تحرك الرسم نحو اليسار بمقدار ٤ وحدات ونحو الأسفل بمقدار وحدة واحدة، فتصبح القاعدة:<br> <span class="math-text text-xl mt-3 block bg-indigo-50 p-2 rounded">ق(س) = |س + ٤| - ١</span>',
+                hintMsg: 'عزيزتي الطالبة، لاحظي نقطة الرأس للاقتران الوردي، أين تقع بالنسبة لنقطة الأصل (٠ ، ٠)؟'
+            },
+            {
+                type: 'quiz',
+                title: 'المستوى الثالث: حددي الانسحاب الصحيح',
+                instruction: 'الاقتران الأصلي الأزرق هو <span class="math-text">ق(س) = س²</span>. <br>ما هو التحويل الذي حدث ليعطينا الاقتران الوردي؟',
+                baseFunc: 'x2',
+                targetTransform: { h: 3, k: -2, rx: false, ry: false },
+                options: [
+                    { id: 1, text: 'انسحاب ٣ وحدات لليسار ووحدتين للأسفل', isCorrect: false },
+                    { id: 2, text: 'انسحاب ٣ وحدات لليمين ووحدتين للأسفل', isCorrect: true },
+                    { id: 3, text: 'انسحاب ٣ وحدات لليمين ووحدتين للأعلى', isCorrect: false }
+                ],
+                successMsg: 'أحسنتِ يا عزيزتي الطالبة! الانسحاب لليمين بمقدار ٣ وللأسفل بمقدار ٢.<br> <span class="math-text text-xl mt-3 block bg-indigo-50 p-2 rounded">ق(س) = (س - ٣)² - ٢</span>',
+                hintMsg: 'دائماً انتبهي لنقطة الرأس للاقتران (الزاوية السفلية)، كيف تحركت من (٠ ، ٠)؟'
+            },
+            {
+                type: 'interactive',
+                title: 'المستوى الرابع: تحدي السحب المباشر',
+                instruction: 'اسحبي الاقتران الأصلي <span class="math-text">ق(س) = س³</span> <br>بمقدار <strong>وحدتين إلى اليسار</strong> و <strong>وحدة واحدة إلى الأسفل</strong>.',
+                baseFunc: 'x3',
+                targetTransform: { h: -2, k: -1, rx: false, ry: false },
+                successMsg: 'ممتازة! الانسحاب لليسار يجعل الإشارة موجبة داخل القوس، وللأسفل سالبة خارجه.<br> <span class="math-text text-xl mt-3 block bg-indigo-50 p-2 rounded">ق(س) = (س + ٢)³ - ١</span>',
+                hintMsg: 'تذكري أن الانسحاب لليسار يعني التحرك بالاتجاه السالب لمحور السينات.'
+            },
+            {
+                type: 'quiz',
+                title: 'المستوى الخامس: اختاري القاعدة',
+                instruction: 'الاقتران الأصلي الأزرق هو <span class="math-text">ق(س) = س³</span>.<br> أي من القواعد التالية تمثل الاقتران الوردي الناتج عن التحويل؟',
+                baseFunc: 'x3', 
+                targetTransform: { h: 2, k: 3, rx: false, ry: false }, 
+                options: [
+                    { id: 1, text: '<span class="math-text">ق(س) = (س + ٢)³ + ٣</span>', isCorrect: false },
+                    { id: 2, text: '<span class="math-text">ق(س) = (س - ٢)³ - ٣</span>', isCorrect: false },
+                    { id: 3, text: '<span class="math-text">ق(س) = (س - ٢)³ + ٣</span>', isCorrect: true }
+                ],
+                successMsg: 'إجابة دقيقة! (س - ٢) تعني انسحاب لليمين بمقدار ٢، و (+٣) تعني انسحاب للأعلى بمقدار ٣.',
+                hintMsg: 'تذكري أن الانسحاب لليمين نعبر عنه بإشارة سالبة داخل القوس، والانسحاب للأعلى بإشارة موجبة خارج القوس.'
+            },
+            {
+                type: 'interactive',
+                title: 'المستوى السادس: انعكاس حول المحور الصادي',
+                instruction: 'الاقتران الأصلي <span class="math-text">ق(س) = س³</span>. <br>المطلوب: اعكسي الاقتران حول <strong>محور ص</strong> فقط.',
+                baseFunc: 'x3',
+                targetTransform: { h: 0, k: 0, rx: false, ry: true },
+                successMsg: 'رائعة! الانعكاس حول محور ص يُغير إشارة س، وتصبح القاعدة:<br> <span class="math-text text-xl mt-3 block bg-indigo-50 p-2 rounded">ق(س) = (-س)³</span>',
+                hintMsg: 'استخدمي زر "انعكاس حول محور ص" لقلب الرسم أفقياً.'
+            },
+            {
+                type: 'interactive',
+                title: 'المستوى السابع: الانعكاس والانسحاب الرأسي',
+                instruction: 'الاقتران الأصلي <span class="math-text">ق(س) = س²</span>.<br> المطلوب: اعكسي الاقتران حول <strong>محور س</strong>، ثم اسحبيه <strong>٤ وحدات إلى الأعلى</strong>.',
+                baseFunc: 'x2',
+                targetTransform: { h: 0, k: 4, rx: true, ry: false },
+                successMsg: 'بطلة! الانعكاس حول محور س يقلب الرسمة للأسفل (-ق(س))، ثم الرفع للأعلى (+٤)، القاعدة هي:<br> <span class="math-text text-xl mt-3 block bg-indigo-50 p-2 rounded">ق(س) = -س² + ٤</span>',
+                hintMsg: 'استخدمي زر "انعكاس حول محور س" لقلب الرسم، ثم اسحبي المنحنى للأعلى.'
+            },
+            {
+                type: 'quiz',
+                title: 'المستوى الثامن: اكتشفي الانعكاس والانسحاب',
+                instruction: 'الاقتران الأصلي الأزرق هو <span class="math-text">ق(س) = |س|</span>. <br>أي القواعد التالية تمثل الاقتران الوردي؟',
+                baseFunc: 'abs',
+                targetTransform: { h: 0, k: 3, rx: true, ry: false },
+                options: [
+                    { id: 1, text: '<span class="math-text">ق(س) = |س| + ٣</span>', isCorrect: false },
+                    { id: 2, text: '<span class="math-text">ق(س) = -|س| + ٣</span>', isCorrect: true },
+                    { id: 3, text: '<span class="math-text">ق(س) = -|س - ٣|</span>', isCorrect: false }
+                ],
+                successMsg: 'إجابة دقيقة! الانعكاس حول محور س قلب الرسمة للأسفل، ثم تم رفعها ٣ وحدات للأعلى.',
+                hintMsg: 'الرسمة مقلوبة للأسفل، هذا يعني وجود انعكاس حول محور س. ولاحظي أين يقع رأس المنحنى الآن.'
+            },
+            {
+                type: 'interactive',
+                title: 'المستوى التاسع: التحدي النهائي',
+                instruction: 'اجمعي ما تعلمته! الاقتران الأصلي <span class="math-text">ق(س) = |س|</span>.<br> ١. انسحاب <strong>وحدتين إلى اليسار</strong>.<br> ٢. انسحاب <strong>٣ وحدات إلى الأسفل</strong>.<br> ٣. انعكاس حول <strong>محور س</strong>.',
+                baseFunc: 'abs',
+                targetTransform: { h: -2, k: -3, rx: true, ry: false },
+                successMsg: 'إنجاز رائع يا عزيزتي الطالبة! لقد طبقتِ جميع التحويلات ببراعة. القاعدة النهائية:<br> <span class="math-text text-xl mt-3 block bg-indigo-50 p-2 rounded">ق(س) = -|س + ٢| - ٣</span>',
+                hintMsg: 'اسحبي المنحنى لليسار خطوتين، وللأسفل ٣ خطوات، ولا تنسي الضغط على زر الانعكاس حول محور س.'
+            }
+        ];
+
+        function drawGrid() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.beginPath();
+            ctx.strokeStyle = '#f1f5f9'; 
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= canvas.width; i += scale) {
+                ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height);
+                ctx.moveTo(0, i); ctx.lineTo(canvas.width, i);
+            }
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.strokeStyle = '#94a3b8';
+            ctx.lineWidth = 2.5;
+            ctx.moveTo(0, origin.y); ctx.lineTo(canvas.width, origin.y);
+            ctx.moveTo(origin.x, 0); ctx.lineTo(origin.x, canvas.height);
+            ctx.stroke();
+
+            ctx.fillStyle = '#475569';
+            ctx.font = 'bold 18px Cairo';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('س', canvas.width - 20, origin.y - 25);
+            ctx.fillText('ص', origin.x - 25, 20);
+
+            ctx.font = 'bold 14px Cairo';
+            for (let x = -10; x <= 10; x++) {
+                if (x === 0) continue;
+                let cx = origin.x + x * scale;
+                ctx.beginPath(); ctx.moveTo(cx, origin.y - 4); ctx.lineTo(cx, origin.y + 4); ctx.stroke();
+                let textToDraw = x < 0 ? "-" + toArabicNum(Math.abs(x)) : toArabicNum(x);
+                ctx.fillText(textToDraw, cx, origin.y + 20);
+            }
+
+            for (let y = -10; y <= 10; y++) {
+                if (y === 0) continue;
+                let cy = origin.y - y * scale;
+                ctx.beginPath(); ctx.moveTo(origin.x - 4, cy); ctx.lineTo(origin.x + 4, cy); ctx.stroke();
+                let textToDraw = y < 0 ? "-" + toArabicNum(Math.abs(y)) : toArabicNum(y);
+                ctx.fillText(textToDraw, origin.x - 22, cy);
+            }
+        }
+
+        function mathFunc(type, x) {
+            if (type === 'x2') return x * x;
+            if (type === 'abs') return Math.abs(x);
+            if (type === 'x3') return x * x * x;
+            return 0;
+        }
+
+        function drawFunctionCurve(type, transform, color, lineWidth = 4, isDashed = false) {
+            ctx.beginPath();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = lineWidth;
+            if (isDashed) ctx.setLineDash([8, 6]);
+            else ctx.setLineDash([]);
+            ctx.lineJoin = 'round';
+
+            let firstPoint = true;
+
+            for (let cx = 0; cx <= canvas.width; cx += 2) {
+                let mathX = (cx - origin.x) / scale;
+                let evalX = mathX - transform.h;
+                if (transform.ry) evalX = -evalX; 
+                
+                let mathY = mathFunc(type, evalX);
+                if (transform.rx) mathY = -mathY; 
+                mathY += transform.k;             
+
+                let cy = origin.y - (mathY * scale);
+
+                if (firstPoint) {
+                    ctx.moveTo(cx, cy);
+                    firstPoint = false;
+                } else {
+                    ctx.lineTo(cx, cy);
+                }
+            }
+            ctx.stroke();
+            ctx.setLineDash([]); 
+        }
+
+        function drawAll() {
+            drawGrid();
+            const levelData = levels[currentLevel];
+            if(!levelData) return;
+            
+            if (levelData.type === 'interactive') {
+                drawFunctionCurve(levelData.baseFunc, { h: 0, k: 0, rx: false, ry: false }, '#3b82f6', 2, true); 
+                drawFunctionCurve(levelData.baseFunc, userTransform, '#ec4899', 5); 
+            } else if (levelData.type === 'quiz') {
+                drawFunctionCurve(levelData.baseFunc, { h: 0, k: 0, rx: false, ry: false }, '#3b82f6', 2, true); 
+                drawFunctionCurve(levelData.baseFunc, levelData.targetTransform, '#ec4899', 5);
+            }
+        }
+
+        let isDragging = false;
+        let dragStartPointer = { x: 0, y: 0 };
+        let dragStartTransform = { h: 0, k: 0 };
+
+        canvas.addEventListener('pointerdown', (e) => {
+            if (levels[currentLevel].type !== 'interactive') return;
+            
+            const rect = canvas.getBoundingClientRect();
+            // حساب نسبة التصغير/التكبير لعرض الكانفاس الحقيقي
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+
+            dragStartPointer = {
+                x: (e.clientX - rect.left) * scaleX,
+                y: (e.clientY - rect.top) * scaleY
+            };
+            
+            dragStartTransform = { h: userTransform.h, k: userTransform.k };
+            isDragging = true;
+            canvas.setPointerCapture(e.pointerId);
+        });
+
+        canvas.addEventListener('pointermove', (e) => {
+            if (!isDragging) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+
+            const currentX = (e.clientX - rect.left) * scaleX;
+            const currentY = (e.clientY - rect.top) * scaleY;
+
+            // التغير بالبكسل الداخلي للكانفاس
+            const dxPixels = currentX - dragStartPointer.x;
+            const dyPixels = currentY - dragStartPointer.y;
+
+            // تحويل البكسلات إلى وحدات رياضية بناءً على المقياس
+            const dxMath = dxPixels / scale;
+            const dyMath = -dyPixels / scale; // نعكس الصادات لأن Y للكانفاس يبدأ من الأعلى
+
+            // التقريب لأقرب وحدة صحيحة ليتطابق مع الشبكة الرياضية
+            userTransform.h = dragStartTransform.h + Math.round(dxMath);
+            userTransform.k = dragStartTransform.k + Math.round(dyMath);
+
+            drawAll();
+        });
+
+        canvas.addEventListener('pointerup', (e) => {
+            isDragging = false;
+            canvas.releasePointerCapture(e.pointerId);
+        });
+
+        canvas.addEventListener('pointercancel', (e) => {
+            isDragging = false;
+            canvas.releasePointerCapture(e.pointerId);
+        });
+
+        function startGame() {
+            document.getElementById('start-screen').classList.add('hide');
+            document.getElementById('game-screen').classList.remove('hide');
+            
+            currentLevel = 0;
+            score = 0;
+            lives = 3;
+            updateHUD();
+            loadLevel();
+        }
+
+        function updateHUD() {
+            document.getElementById('level-indicator').innerText = toArabicNum(currentLevel + 1) + ' / ' + toArabicNum(maxLevels);
+            document.getElementById('progress-bar').style.width = `${((currentLevel) / maxLevels) * 100}%`;
+            document.getElementById('score-display').innerText = toArabicNum(score);
+            
+            let hearts = '';
+            for(let i=0; i<3; i++) hearts += (i < lives) ? '❤️' : '🖤';
+            document.getElementById('lives-display').innerText = hearts;
+        }
+
+        function loadLevel() {
+            if (currentLevel >= maxLevels) {
+                showEndScreen();
+                return;
+            }
+
+            const levelData = levels[currentLevel];
+            resetMovement(); 
+            selectedOptionId = null;
+
+            document.getElementById('level-title').innerHTML = levelData.title;
+            document.getElementById('level-instruction').innerHTML = levelData.instruction;
+
+            const controlsDiv = document.getElementById('interactive-controls');
+            const quizDiv = document.getElementById('quiz-options');
+            
+            if (levelData.type === 'interactive') {
+                controlsDiv.classList.remove('hide');
+                quizDiv.classList.add('hide');
+                updateReflectButtonsUI();
+            } else {
+                controlsDiv.classList.add('hide');
+                quizDiv.classList.remove('hide');
+                
+                quizDiv.innerHTML = '';
+                levelData.options.forEach(opt => {
+                    const btn = document.createElement('button');
+                    btn.className = 'option-btn text-right w-full p-4 md:p-5 rounded-xl text-lg font-bold bg-white hover:bg-gray-50 flex items-center';
+                    btn.innerHTML = `<i class="fa-regular fa-circle ml-3 text-gray-400 text-xl"></i> <span class="flex-1">${opt.text}</span>`;
+                    btn.onclick = () => selectOption(opt.id, btn);
+                    quizDiv.appendChild(btn);
+                });
+            }
+
+            // لضمان رسم الحجم الصحيح في الشاشات
+            setTimeout(drawAll, 50);
+        }
+
+        function moveGraph(dx, dy) {
+            userTransform.h += dx;
+            userTransform.k += dy;
+            drawAll();
+        }
+
+        function toggleReflect(axis) {
+            if (axis === 'x') userTransform.rx = !userTransform.rx;
+            if (axis === 'y') userTransform.ry = !userTransform.ry;
+            updateReflectButtonsUI();
+            drawAll();
+        }
+
+        function updateReflectButtonsUI() {
+            const btnX = document.getElementById('btn-reflect-x');
+            const btnY = document.getElementById('btn-reflect-y');
+            
+            if (userTransform.rx) {
+                btnX.classList.replace('bg-purple-100', 'bg-purple-500');
+                btnX.classList.replace('text-purple-700', 'text-white');
+            } else {
+                btnX.classList.replace('bg-purple-500', 'bg-purple-100');
+                btnX.classList.replace('text-white', 'text-purple-700');
+            }
+
+            if (userTransform.ry) {
+                btnY.classList.replace('bg-purple-100', 'bg-purple-500');
+                btnY.classList.replace('text-purple-700', 'text-white');
+            } else {
+                btnY.classList.replace('bg-purple-500', 'bg-purple-100');
+                btnY.classList.replace('text-white', 'text-purple-700');
+            }
+        }
+
+        function resetMovement() {
+            userTransform = { h: 0, k: 0, rx: false, ry: false };
+            updateReflectButtonsUI();
+            drawAll();
+        }
+
+        function selectOption(id, btnElement) {
+            selectedOptionId = id;
+            const btns = document.querySelectorAll('.option-btn');
+            btns.forEach(b => {
+                b.classList.remove('selected');
+                b.querySelector('i').classList.replace('fa-dot-circle', 'fa-circle');
+                b.querySelector('i').classList.replace('text-indigo-600', 'text-gray-400');
+            });
+            btnElement.classList.add('selected');
+            btnElement.querySelector('i').classList.replace('fa-circle', 'fa-dot-circle');
+            btnElement.querySelector('i').classList.replace('text-gray-400', 'text-indigo-600');
+        }
+
+        let isWaitingForNext = false;
+
+        function checkAnswer() {
+            const levelData = levels[currentLevel];
+            let isCorrect = false;
+
+            if (levelData.type === 'interactive') {
+                if (userTransform.h === levelData.targetTransform.h &&
+                    userTransform.k === levelData.targetTransform.k &&
+                    userTransform.rx === levelData.targetTransform.rx &&
+                    userTransform.ry === levelData.targetTransform.ry) {
+                    isCorrect = true;
+                }
+            } else if (levelData.type === 'quiz') {
+                if (selectedOptionId === null) {
+                    showModal('تنبيه', 'الرجاء اختيار إجابة أولاً.', 'warning');
+                    return;
+                }
+                const correctOpt = levelData.options.find(o => o.isCorrect);
+                if (selectedOptionId === correctOpt.id) {
+                    isCorrect = true;
+                }
+            }
+
+            if (isCorrect) {
+                score += 100;
+                isWaitingForNext = true;
+                showModal('إجابة صحيحة!', levelData.successMsg, 'success');
+            } else {
+                lives--;
+                updateHUD();
+                
+                if (lives <= 0) {
+                    showModal('انتهت المحاولات', 'لا تحزني يا عزيزتي الطالبة، يمكنك إعادة اللعبة والمحاولة مرة أخرى!', 'fail');
+                    isWaitingForNext = true; 
+                } else {
+                    showModal('عزيزتي الطالبة، حاولي مرة أخرى', levelData.hintMsg, 'error');
+                }
+            }
+        }
+
+        function showModal(title, msg, type) {
+            const modal = document.getElementById('feedback-modal');
+            const icon = document.getElementById('feedback-icon');
+            const titleEl = document.getElementById('feedback-title');
+            const msgEl = document.getElementById('feedback-msg');
+            const btn = document.getElementById('btn-feedback-action');
+
+            titleEl.innerText = title;
+            msgEl.innerHTML = msg;
+
+            if (type === 'success') {
+                icon.innerText = '🎉';
+                titleEl.className = 'text-2xl md:text-3xl font-bold mb-2 text-green-600';
+                btn.className = 'w-full bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-6 rounded-xl transition text-xl';
+                btn.innerText = 'التالي';
+            } else if (type === 'error') {
+                icon.innerText = '💡';
+                titleEl.className = 'text-2xl md:text-3xl font-bold mb-2 text-orange-500';
+                btn.className = 'w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-4 px-6 rounded-xl transition text-xl';
+                btn.innerText = 'إعادة المحاولة';
+            } else if (type === 'warning') {
+                icon.innerText = '⚠️';
+                titleEl.className = 'text-2xl md:text-3xl font-bold mb-2 text-yellow-500';
+                btn.className = 'w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-4 px-6 rounded-xl transition text-xl';
+                btn.innerText = 'حسناً';
+            } else if (type === 'fail') {
+                icon.innerText = '💔';
+                titleEl.className = 'text-2xl md:text-3xl font-bold mb-2 text-red-600';
+                btn.className = 'w-full bg-red-500 hover:bg-red-600 text-white font-bold py-4 px-6 rounded-xl transition text-xl';
+                btn.innerText = 'عرض النتيجة';
+            }
+
+            modal.classList.remove('hide');
+        }
+
+        function closeFeedback() {
+            document.getElementById('feedback-modal').classList.add('hide');
+            
+            if (lives <= 0) {
+                showEndScreen();
+                return;
+            }
+
+            if (isWaitingForNext) {
+                isWaitingForNext = false;
+                currentLevel++;
+                updateHUD();
+                loadLevel();
+            }
+        }
+
+        function showEndScreen() {
+            document.getElementById('game-screen').classList.add('hide');
+            document.getElementById('end-screen').classList.remove('hide');
+            
+            document.getElementById('final-score').innerText = toArabicNum(score);
+            
+            let hearts = '';
+            for(let i=0; i<3; i++) hearts += (i < lives) ? '❤️' : '🖤';
+            document.getElementById('final-lives').innerText = hearts;
+            
+            document.getElementById('progress-bar').style.width = '100%';
+        }
+
+        window.addEventListener('resize', () => {
+            if(!document.getElementById('game-screen').classList.contains('hide')){
+                drawAll();
+            }
+        });
+
+    </script>
+</body>
+</html>
