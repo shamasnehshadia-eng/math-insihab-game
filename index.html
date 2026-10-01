@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لعبة انسحاب الاقترانات</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f3f4f6;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .container {
+            background-color: white;
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            padding: 1rem;
+            width: 100%;
+            max-width: 800px;
+            text-align: center;
+        }
+        @media (min-width: 768px) {
+            .container { padding: 2rem; }
+        }
+        canvas {
+            border: 2px solid #e5e7eb;
+            border-radius: 0.5rem;
+            background-color: #f9fafb;
+            margin: 1rem auto;
+            display: block;
+            touch-action: none; /* Prevent scrolling when touching canvas */
+            width: 100%;
+            max-width: 400px;
+            height: auto;
+            aspect-ratio: 1 / 1;
+        }
+        .button {
+            background-color: #3b82f6;
+            color: white;
+            font-weight: bold;
+            padding: 0.5rem 1rem;
+            border-radius: 0.25rem;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            margin: 0.25rem;
+        }
+        .button:hover {
+            background-color: #2563eb;
+        }
+        .button:disabled {
+            background-color: #9ca3af;
+            cursor: not-allowed;
+        }
+        .input-group {
+            margin: 1rem 0;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 1rem;
+            align-items: center;
+        }
+        select, input[type="number"] {
+            padding: 0.5rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.25rem;
+            font-size: 1rem;
+            text-align: center;
+        }
+        .feedback {
+            font-size: 1.25rem;
+            font-weight: bold;
+            min-height: 2rem;
+            margin-top: 1rem;
+        }
+        .correct { color: #10b981; }
+        .incorrect { color: #ef4444; }
+        .info { color: #3b82f6; }
+        
+        #score-container {
+            display: flex;
+            justify-content: space-between;
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-bottom: 1rem;
+            color: #4b5563;
+        }
+        
+        .axis-label {
+            font-size: 12px;
+            fill: #6b7280;
+        }
+        
+        .function-display {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #1f2937;
+            background: #f3f4f6;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin: 1rem 0;
+            direction: ltr; /* keep math left to right */
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1 class="text-2xl md:text-3xl font-bold mb-4 text-gray-800">لعبة انسحاب الاقترانات</h1>
+        
+        <div class="flex flex-col md:flex-row justify-between items-center bg-blue-50 p-3 md:p-4 rounded-lg border border-blue-200 mb-4 text-blue-800 font-medium gap-2 text-sm md:text-base">
+            <div>إعداد الطالبة: <span class="font-bold text-blue-900 text-lg">رغد شماسنة</span> (الصف العاشر)</div>
+            <div>إشراف المعلمة: <span class="font-bold text-blue-900 text-lg">تحرير</span></div>
+        </div>
+
+        <p class="text-gray-600 mb-6 text-sm md:text-base leading-relaxed">حلل الاقتران المعروض وحدد اتجاه ومقدار الانسحاب لترسمه بالشكل الصحيح.<br><span class="text-blue-500 font-bold bg-blue-50 px-2 py-1 rounded inline-block mt-2">💡 يمكنك أيضاً سحب الرسمة بإصبعك أو الماوس!</span></p>
+
+        <div id="score-container">
+            <span>المستوى: <span id="level-display">1</span></span>
+            <span>النقاط: <span id="score-display">0</span></span>
+        </div>
+
+        <div class="mb-4">
+            <h2 class="text-lg md:text-xl font-semibold text-gray-700">الاقتران الأصلي: <span dir="ltr">ق(س) = س²</span></h2>
+            <p class="text-sm md:text-md text-gray-600 mt-1">المطلوب رسم الاقتران:</p>
+            <div id="target-function" class="function-display">
+                ل(س) = س² - 1
+            </div>
+        </div>
+
+        <div class="relative w-full max-w-lg mx-auto">
+            <canvas id="graph-canvas" width="400" height="400"></canvas>
+        </div>
+
+        <div class="input-group bg-gray-50 p-3 md:p-4 rounded-lg border border-gray-200 flex-col md:flex-row gap-4 md:gap-8">
+            <div class="flex flex-col items-center gap-1 w-full">
+                <div class="flex items-center gap-2 justify-center w-full">
+                    <label for="h-shift" class="font-bold text-sm md:text-base">أفقي:</label>
+                    <button class="button px-4 py-2 text-xl leading-none shadow-sm" onclick="adjustShift('h', -1)">-</button>
+                    <input type="number" id="h-shift" value="0" min="-10" max="10" class="w-16 text-lg font-bold shadow-inner" readonly>
+                    <button class="button px-4 py-2 text-xl leading-none shadow-sm" onclick="adjustShift('h', 1)">+</button>
+                </div>
+                <span class="text-xs text-gray-500">(+ يمين, - يسار)</span>
+            </div>
+            
+            <div class="flex flex-col items-center gap-1 w-full">
+                <div class="flex items-center gap-2 justify-center w-full">
+                    <label for="v-shift" class="font-bold text-sm md:text-base">عمودي:</label>
+                    <button class="button px-4 py-2 text-xl leading-none shadow-sm" onclick="adjustShift('v', -1)">-</button>
+                    <input type="number" id="v-shift" value="0" min="-10" max="10" class="w-16 text-lg font-bold shadow-inner" readonly>
+                    <button class="button px-4 py-2 text-xl leading-none shadow-sm" onclick="adjustShift('v', 1)">+</button>
+                </div>
+                <span class="text-xs text-gray-500">(+ أعلى, - أسفل)</span>
+            </div>
+        </div>
+
+        <div class="mt-4 flex justify-center gap-4">
+            <button id="check-btn" class="button bg-green-500 hover:bg-green-600 text-lg px-8 py-2" onclick="checkAnswer()">تحقق من الرسم</button>
+            <button id="next-btn" class="button bg-blue-500 hover:bg-blue-600 text-lg px-8 py-2 hidden" onclick="nextQuestion()">السؤال التالي</button>
+        </div>
+
+        <div id="feedback-msg" class="feedback"></div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('graph-canvas');
+        const ctx = canvas.getContext('2d');
+        const targetFunctionDisplay = document.getElementById('target-function');
+        const hShiftInput = document.getElementById('h-shift');
+        const vShiftInput = document.getElementById('v-shift');
+        const feedbackMsg = document.getElementById('feedback-msg');
+        const checkBtn = document.getElementById('check-btn');
+        const nextBtn = document.getElementById('next-btn');
+        const scoreDisplay = document.getElementById('score-display');
+        const levelDisplay = document.getElementById('level-display');
+
+        // Grid properties
+        const gridSize = 20; // 20 units across
+        const pixelsPerUnit = canvas.width / gridSize;
+        const originX = canvas.width / 2;
+        const originY = canvas.height / 2;
+
+        let currentHShift = 0;
+        let currentVShift = 0;
+        let score = 0;
+        let currentLevel = 0;
+
+        // Base function is always x^2 for this specific game based on the worksheet
+        const baseFunction = (x) => x * x;
+
+        // Questions based on the worksheet (image.png)
+        const questions = [
+            {
+                name: "ل(س)",
+                display: "ل(س) = س² - 1",
+                correctH: 0,
+                correctV: -1,
+                explanation: "سالب واحد خارج التربيع يعني انسحاب للأسفل بمقدار وحدة واحدة."
+            },
+            {
+                name: "هـ(س)",
+                display: "هـ(س) = (س - 4)²",
+                correctH: 4, // Shift right by 4
+                correctV: 0,
+                explanation: "سالب 4 داخل القوس مع س يعني انسحاب لليمين بمقدار 4 وحدات."
+            },
+            {
+                name: "ع(س)",
+                display: "ع(س) = (س - 3)² + 2",
+                correctH: 3, // Shift right by 3
+                correctV: 2, // Shift up by 2
+                explanation: "سالب 3 داخل القوس يعني لليمين 3 وحدات، وموجب 2 خارجه يعني للأعلى وحدتين."
+            },
+            // Adding a few more based on the complete square example
+            {
+                name: "د(س)",
+                display: "د(س) = (س - 3)² + 1", // Result of completing square for س² - 6س + 10
+                correctH: 3,
+                correctV: 1,
+                explanation: "بعد إكمال المربع، نرى انسحاباً لليمين 3 وحدات وللأعلى وحدة واحدة."
+            },
+            {
+                name: "م(س)",
+                display: "م(س) = (س + 2)² - 3", 
+                correctH: -2, // Left
+                correctV: -3, // Down
+                explanation: "موجب 2 داخل القوس يعني لليسار وحدتين، وسالب 3 بالخارج للأسفل 3 وحدات."
+            }
+        ];
+
+        let currentQuestion = null;
+
+        function drawGrid() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw grid lines
+            ctx.strokeStyle = '#e5e7eb';
+            ctx.lineWidth = 1;
+            
+            for (let i = 0; i <= canvas.width; i += pixelsPerUnit) {
+                // Vertical lines
+                ctx.beginPath();
+                ctx.moveTo(i, 0);
+                ctx.lineTo(i, canvas.height);
+                ctx.stroke();
+                
+                // Horizontal lines
+                ctx.beginPath();
+                ctx.moveTo(0, i);
+                ctx.lineTo(canvas.width, i);
+                ctx.stroke();
+            }
+
+            // Draw axes
+            ctx.strokeStyle = '#374151';
+            ctx.lineWidth = 2;
+            
+            // X-axis
+            ctx.beginPath();
+            ctx.moveTo(0, originY);
+            ctx.lineTo(canvas.width, originY);
+            ctx.stroke();
+            
+            // Y-axis
+            ctx.beginPath();
+            ctx.moveTo(originX, 0);
+            ctx.lineTo(originX, canvas.height);
+            ctx.stroke();
+
+            // Draw labels
+            ctx.fillStyle = '#6b7280';
+            ctx.font = '10px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            
+            // Numbers on axes
+            for (let i = -gridSize/2; i <= gridSize/2; i++) {
+                if (i !== 0) {
+                    // X-axis numbers
+                    let xPos = originX + i * pixelsPerUnit;
+                    ctx.fillText(i, xPos, originY + 5);
+                    
+                    // Draw small tick marks
+                    ctx.beginPath();
+                    ctx.moveTo(xPos, originY - 3);
+                    ctx.lineTo(xPos, originY + 3);
+                    ctx.stroke();
+
+                    // Y-axis numbers
+                    let yPos = originY - i * pixelsPerUnit; // minus because canvas y goes down
+                    ctx.textAlign = 'right';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(i, originX - 5, yPos);
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(originX - 3, yPos);
+                    ctx.lineTo(originX + 3, yPos);
+                    ctx.stroke();
+                }
+            }
+        }
+
+        function drawGraph(fn, color, isBase = false, hShift = 0, vShift = 0) {
+            ctx.beginPath();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 3;
+            
+            if (isBase) {
+                ctx.setLineDash([5, 5]); // Dashed line for base function
+                ctx.strokeStyle = 'rgba(156, 163, 175, 0.6)'; // Light gray
+            } else {
+                ctx.setLineDash([]);
+            }
+
+            let firstPoint = true;
+            // Draw curve by evaluating points
+            for (let pixelX = 0; pixelX <= canvas.width; pixelX++) {
+                // Convert pixel coordinates to logical math coordinates
+                let mathX = (pixelX - originX) / pixelsPerUnit;
+                
+                // Apply horizontal shift (subtracting hShift moves it right)
+                // In the formula (x-h)^2, h is the shift to the right.
+                // So we evaluate baseFunction at (mathX - hShift)
+                let mathY = baseFunction(mathX - hShift) + vShift;
+                
+                // Convert logical math Y back to pixel Y
+                let pixelY = originY - (mathY * pixelsPerUnit);
+                
+                if (pixelY >= 0 && pixelY <= canvas.height) {
+                    if (firstPoint) {
+                        ctx.moveTo(pixelX, pixelY);
+                        firstPoint = false;
+                    } else {
+                        ctx.lineTo(pixelX, pixelY);
+                    }
+                } else {
+                    firstPoint = true; // Break line if it goes out of bounds
+                }
+            }
+            ctx.stroke();
+            ctx.setLineDash([]); // Reset dash
+        }
+
+        function updateScene() {
+            drawGrid();
+            // Draw base function y = x^2
+            drawGraph(baseFunction, '#9ca3af', true, 0, 0);
+            
+            // Draw user's shifted function
+            currentHShift = parseInt(hShiftInput.value) || 0;
+            currentVShift = parseInt(vShiftInput.value) || 0;
+            drawGraph(baseFunction, '#3b82f6', false, currentHShift, currentVShift);
+        }
+
+        function adjustShift(axis, amount) {
+            if (axis === 'h') {
+                let val = parseInt(hShiftInput.value) + amount;
+                if(val >= -10 && val <= 10) {
+                    hShiftInput.value = val;
+                }
+            } else {
+                let val = parseInt(vShiftInput.value) + amount;
+                if(val >= -10 && val <= 10) {
+                    vShiftInput.value = val;
+                }
+            }
+            updateScene();
+            // Clear feedback when user moves things
+            feedbackMsg.textContent = '';
+            feedbackMsg.className = 'feedback';
+        }
+
+        function loadQuestion(index) {
+            currentLevel = index;
+            currentQuestion = questions[index];
+            targetFunctionDisplay.textContent = currentQuestion.display;
+            levelDisplay.textContent = currentLevel + 1;
+            
+            // Reset inputs
+            hShiftInput.value = 0;
+            vShiftInput.value = 0;
+            
+            // Reset UI states
+            checkBtn.classList.remove('hidden');
+            nextBtn.classList.add('hidden');
+            feedbackMsg.textContent = 'حرك الرسمة لتطابق الاقتران المعروض أعلاه.';
+            feedbackMsg.className = 'feedback info';
+            
+            updateScene();
+        }
+
+        function checkAnswer() {
+            const userH = parseInt(hShiftInput.value);
+            const userV = parseInt(vShiftInput.value);
+            
+            if (userH === currentQuestion.correctH && userV === currentQuestion.correctV) {
+                // Correct
+                score += 10;
+                scoreDisplay.textContent = score;
+                feedbackMsg.innerHTML = `رائع! إجابة صحيحة. <br><span class="text-sm font-normal">${currentQuestion.explanation}</span>`;
+                feedbackMsg.className = 'feedback correct';
+                
+                checkBtn.classList.add('hidden');
+                
+                // Show next button or end game
+                if (currentLevel < questions.length - 1) {
+                    nextBtn.classList.remove('hidden');
+                } else {
+                    feedbackMsg.innerHTML += "<br><strong>مبروك! لقد أكملت جميع الأسئلة.</strong>";
+                    nextBtn.textContent = "إعادة اللعب";
+                    nextBtn.onclick = resetGame;
+                    nextBtn.classList.remove('hidden');
+                }
+                
+                // Highlight correct graph
+                drawGrid();
+                drawGraph(baseFunction, '#9ca3af', true, 0, 0);
+                drawGraph(baseFunction, '#10b981', false, currentQuestion.correctH, currentQuestion.correctV); // Draw green
+                
+            } else {
+                // Incorrect
+                let msg = "حاول مرة أخرى. ";
+                if (userH !== currentQuestion.correctH) {
+                    msg += "الانسحاب الأفقي غير دقيق. ";
+                }
+                if (userV !== currentQuestion.correctV) {
+                    msg += "الانسحاب العمودي غير دقيق.";
+                }
+                feedbackMsg.textContent = msg;
+                feedbackMsg.className = 'feedback incorrect';
+            }
+        }
+
+        function nextQuestion() {
+            if (currentLevel < questions.length - 1) {
+                loadQuestion(currentLevel + 1);
+            }
+        }
+
+        function resetGame() {
+            score = 0;
+            scoreDisplay.textContent = score;
+            nextBtn.textContent = "السؤال التالي";
+            nextBtn.onclick = nextQuestion;
+            loadQuestion(0);
+        }
+
+        // Initialize on load
+        window.onload = () => {
+            loadQuestion(0);
+        };
+
+        let isDragging = false;
+        let dragStartX = 0;
+        let dragStartY = 0;
+        let startHShift = 0;
+        let startVShift = 0;
+
+        function getEventCoords(e) {
+            if (e.touches && e.touches.length > 0) {
+                return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+            }
+            return { x: e.clientX, y: e.clientY };
+        }
+
+        function handleStart(e) {
+            // Only allow dragging if the check button is visible (puzzle is active)
+            if(checkBtn.classList.contains('hidden')) return; 
+            
+            isDragging = true;
+            const coords = getEventCoords(e);
+            dragStartX = coords.x;
+            dragStartY = coords.y;
+            startHShift = parseInt(hShiftInput.value) || 0;
+            startVShift = parseInt(vShiftInput.value) || 0;
+            if(e.cancelable) e.preventDefault(); // Prevent page scroll while dragging
+        }
+
+        function handleMove(e) {
+            if (!isDragging) return;
+            const coords = getEventCoords(e);
+            const dx = coords.x - dragStartX;
+            const dy = coords.y - dragStartY;
+            
+            // Calculate scale based on actual responsive canvas size on screen
+            const rect = canvas.getBoundingClientRect();
+            const displayPixelsPerUnit = rect.width / gridSize;
+            
+            // Calculate units to shift based on drag distance
+            let deltaH = Math.round(dx / displayPixelsPerUnit);
+            let deltaV = Math.round(-dy / displayPixelsPerUnit); // Negative because pulling down reduces Y
+
+            let newH = startHShift + deltaH;
+            let newV = startVShift + deltaV;
+
+            // Clamp inputs within bounds
+            newH = Math.max(-10, Math.min(10, newH));
+            newV = Math.max(-10, Math.min(10, newV));
+
+            hShiftInput.value = newH;
+            vShiftInput.value = newV;
+            
+            updateScene();
+            feedbackMsg.textContent = '';
+            feedbackMsg.className = 'feedback';
+            if(e.cancelable) e.preventDefault();
+        }
+
+        function handleEnd() {
+            isDragging = false;
+        }
+
+        // Mouse Events for Computers
+        canvas.addEventListener('mousedown', handleStart);
+        canvas.addEventListener('mousemove', handleMove);
+        window.addEventListener('mouseup', handleEnd);
+        
+        // Touch Events for Mobile Devices
+        canvas.addEventListener('touchstart', handleStart, {passive: false});
+        canvas.addEventListener('touchmove', handleMove, {passive: false});
+        window.addEventListener('touchend', handleEnd);
+
+    </script>
+</body>
+</html>
